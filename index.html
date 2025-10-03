@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reaction Time (Zig + WASM)</title>
+    <link rel="preload" href="reaction.wasm" as="fetch" type="application/wasm" crossorigin fetchpriority="high" />
+    <style>
+      html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      #wrap { display: grid; place-items: center; height: 100%; gap: 12px; position: relative; }
+      canvas { image-rendering: pixelated; background: #000; box-shadow: 0 0 0 2px #222; touch-action: none; }
+      #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+      #panel { background: rgba(0,0,0,0.8); color: #fff; padding: 12px 16px; border: 1px solid #333; border-radius: 8px; min-width: 240px; text-align: center; }
+      #panel h2 { margin: 0 0 8px 0; font-size: 16px; font-weight: 600; }
+      #panel .nums { display: grid; gap: 6px; margin: 8px 0; font-size: 14px; }
+      #panel button { margin-top: 8px; padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
+      #hint { opacity: 0.8; font-size: 14px; }
+      button { padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <canvas id="canvas" width="480" height="270"></canvas>
+      <div id="overlay"><div id="panel">
+        <h2>Results (5 trials)</h2>
+        <div class="nums">
+          <div id="avg">Average: -</div>
+          <div id="med">Median: -</div>
+          <div id="fast">Fastest: -</div>
+        </div>
+        <button id="reset">Reset</button>
+      </div></div>
+    </div>
+    <script>
+      const canvas = document.getElementById('canvas');
+      let offscreen;
+      let worker;
+      const overlay = document.getElementById('overlay');
+      const avgEl = document.getElementById('avg');
+      const medEl = document.getElementById('med');
+      const fastEl = document.getElementById('fast');
+      const resetBtn = document.getElementById('reset');
+
+      function resizeCanvas() {
+        const w = Math.min(window.innerWidth - 24, 960);
+        const h = Math.min(window.innerHeight - 120, 540);
+        const aspect = 16/9;
+        let tw = w, th = Math.round(w / aspect);
+        if (th > h) { th = h; tw = Math.round(h * aspect); }
+        canvas.style.width = tw + 'px';
+        canvas.style.height = th + 'px';
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      async function loadWasm() {
+        if (WebAssembly.instantiateStreaming) {
+          const { instance } = await WebAssembly.instantiateStreaming(fetch('reaction.wasm'), {});
+          return instance;
+        } else {
+          const response = await fetch('reaction.wasm');
+          const bytes = await response.arrayBuffer();
+          const { instance } = await WebAssembly.instantiate(bytes, {});
+          return instance;
+        }
+      }
+
+      const wasmPromise = loadWasm();
+
+      (async () => {
+        const wasm = await wasmPromise;
+        const exp = wasm.exports;
+        const W = 480, H = 270;
+        canvas.width = W; canvas.height = H;
+        exp.init(W, H);
+
+        let useWorker = false;
+        let ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+        ctx.fillStyle = '#0040c0';
+        ctx.fillRect(0, 0, W, H);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Click to begin', W >> 1, H >> 1);
+
+        try {
+          offscreen = canvas.transferControlToOffscreen();
+          worker = new Worker('worker.js', { type: 'module' });
+          worker.postMessage({ type: 'init', canvas: offscreen, size: { W, H } }, [offscreen]);
+          worker.postMessage({ type: 'paint', state: exp.get_state(), repaint: true, ms: 0 });
+          useWorker = true;
+          ctx = null;
+        } catch (err) {
+          useWorker = false;
+        }
+
+        let last = performance.now();
+        let prevState = -1;
+        let readyAt = 0;
+        let lastJsReactionMs = null;
+        const trials = [];
+        let sessionOver = false;
+
+        function showOverlay(a, m, f) {
+          avgEl.textContent = 'Average: ' + Math.round(a) + ' ms';
+          medEl.textContent = 'Median: ' + Math.round(m) + ' ms';
+          fastEl.textContent = 'Fastest: ' + Math.round(f) + ' ms';
+          overlay.style.display = 'flex';
+          sessionOver = true;
+        }
+
+        function hideOverlay() {
+          overlay.style.display = 'none';
+        }
+
+        function computeStats(arr) {
+          if (arr.length === 0) return { avg: 0, med: 0, fast: 0 };
+          let sum = 0; for (let i = 0; i < arr.length; i++) sum += arr[i];
+          const avg = sum / arr.length;
+          const sorted = arr.slice().sort((a,b) => a-b);
+          const mid = sorted.length >> 1;
+          const med = (sorted.length % 2) ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+          const fast = sorted[0];
+          return { avg, med, fast };
+        }
+        function frame(now) {
+          const dt = now - last; last = now;
+          exp.update(dt);
+
+          // 0=Idle(blue), 1=Waiting(red), 2=Ready(green), 3=Measured(purple), 4=FalseStart (red)
+          const s = exp.get_state();
+          if (s === 2 && prevState !== 2) {
+            readyAt = performance.now();
+            lastJsReactionMs = null;
+          }
+
+          if (!sessionOver && s === 3 && prevState !== 3) {
+            const measured = Math.round(lastJsReactionMs != null ? lastJsReactionMs : exp.get_last_reaction_ms());
+            trials.push(measured);
+            if (trials.length === 5) {
+              const { avg, med, fast } = computeStats(trials);
+              showOverlay(avg, med, fast);
+            }
+          }
+
+          const repaint = s !== prevState;
+          if (repaint) prevState = s;
+
+          const ms = Math.round(lastJsReactionMs != null ? lastJsReactionMs : exp.get_last_reaction_ms());
+          if (useWorker) {
+            worker.postMessage({ type: 'paint', state: s, repaint, ms });
+          } else {
+            if (repaint) {
+              if (s === 0) ctx.fillStyle = '#0040c0';
+              else if (s === 1 || s === 4) ctx.fillStyle = '#c02030';
+              else if (s === 2) ctx.fillStyle = '#18a040';
+              else ctx.fillStyle = '#8020c0';
+              ctx.fillRect(0, 0, W, H);
+            }
+            if (s === 3) {
+              ctx.fillStyle = '#ffcc00';
+              ctx.font = '24px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(ms + ' ms', W >> 1, H >> 1);
+              ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
+            }
+            if (s === 0) {
+              ctx.fillStyle = '#ffffff';
+              ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('Click to begin', W >> 1, H >> 1);
+            }
+            if (s === 4) {
+              ctx.fillStyle = '#ffffff';
+              ctx.font = '18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
+            }
+          }
+
+          requestAnimationFrame(frame);
+        }
+
+        const press = (ts) => {
+          if (sessionOver) return;
+          const s = exp.get_state();
+          if (s === 2 && readyAt > 0) {
+            const nowTs = (typeof ts === 'number') ? ts : performance.now();
+            lastJsReactionMs = nowTs - readyAt;
+          }
+          exp.on_action(1);
+          exp.update(0);
+        };
+        const release = () => { if (sessionOver) return; exp.on_action(0); exp.update(0); };
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); press(); } }, { capture: false, passive: false });
+        window.addEventListener('keyup',   (e) => { if (e.code === 'Space') { e.preventDefault(); release(); } }, { capture: false, passive: false });
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) press(e.timeStamp); }, { capture: false, passive: false });
+        window.addEventListener('pointerrawupdate', (e) => { /* earliest signal hook if needed */ }, { capture: false, passive: true });
+        window.addEventListener('pointerup', (e) => { if (e.button === 0) release(); }, { capture: false, passive: false });
+        resetBtn.addEventListener('click', () => {
+          trials.length = 0;
+          sessionOver = false;
+          hideOverlay();
+          exp.reset();
+        });
+
+        requestAnimationFrame(frame);
+      })();
+    </script>
+  </body>
+  </html>
+

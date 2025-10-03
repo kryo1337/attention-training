@@ -1,9 +1,8 @@
 {
-  "buildCommand": "zig build copy-wasm",
   "outputDirectory": ".",
   "headers": [
     {
-      "source": "/(.*)\\.wasm",
+      "source": "/reaction.wasm",
       "headers": [
         {
           "key": "Content-Type",

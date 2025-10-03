@@ -3,7 +3,7 @@
   "outputDirectory": ".",
   "headers": [
     {
-      "source": "**/*.wasm",
+      "source": "/(.*)\\.wasm",
       "headers": [
         {
           "key": "Content-Type",

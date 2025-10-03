@@ -1,8 +1,6 @@
 {
-  "version": 2,
   "buildCommand": "zig build copy-wasm",
   "outputDirectory": ".",
-  "functions": {},
   "headers": [
     {
       "source": "**/*.wasm",

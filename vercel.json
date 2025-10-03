@@ -1,8 +1,17 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "Dockerfile", "use": "@vercel/docker" }
+  "buildCommand": "zig build copy-wasm",
+  "outputDirectory": ".",
+  "functions": {},
+  "headers": [
+    {
+      "source": "**/*.wasm",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/wasm"
+        }
+      ]
+    }
   ]
 }
-
-

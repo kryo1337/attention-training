@@ -15,6 +15,7 @@ pub fn build(b: *std.Build) void {
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
+    exe.root_module.strip = optimize != .Debug;
 
     b.installArtifact(exe);
 

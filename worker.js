@@ -28,22 +28,22 @@ self.onmessage = (e) => {
     if (s === 3) {
       const ms = msg.ms;
       ctx.fillStyle = '#ffcc00';
-      ctx.font = '24px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.font = '24px "IBM Plex Mono", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-      ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.font = '14px "IBM Plex Mono", monospace';
       ctx.fillStyle = '#ffffff';
       ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
     } else if (s === 0) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.font = '16px "IBM Plex Mono", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('Click to begin', W >> 1, H >> 1);
     } else if (s === 4) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = '18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      ctx.font = '18px "IBM Plex Mono", monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);

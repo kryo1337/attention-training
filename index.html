@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Reaction Time (Zig + WASM)</title>
     <link rel="preload" href="reaction.wasm" as="fetch" type="application/wasm" crossorigin fetchpriority="high" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
-      html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+      html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: 'IBM Plex Mono', monospace; }
       #wrap { display: grid; place-items: center; height: 100%; gap: 12px; position: relative; }
       canvas { image-rendering: pixelated; background: #000; box-shadow: 0 0 0 2px #222; touch-action: none; }
       #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
@@ -80,7 +83,7 @@
         ctx.fillStyle = '#0040c0';
         ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#ffffff';
-        ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+        ctx.font = '16px "IBM Plex Mono", monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Click to begin', W >> 1, H >> 1);
@@ -161,24 +164,24 @@
             }
             if (s === 3) {
               ctx.fillStyle = '#ffcc00';
-              ctx.font = '24px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.font = '24px "IBM Plex Mono", monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-              ctx.font = '14px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.font = '14px "IBM Plex Mono", monospace';
               ctx.fillStyle = '#ffffff';
               ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
             }
             if (s === 0) {
               ctx.fillStyle = '#ffffff';
-              ctx.font = '16px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.font = '16px "IBM Plex Mono", monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('Click to begin', W >> 1, H >> 1);
             }
             if (s === 4) {
               ctx.fillStyle = '#ffffff';
-              ctx.font = '18px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+              ctx.font = '18px "IBM Plex Mono", monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
@@ -196,15 +199,26 @@
             lastJsReactionMs = nowTs - readyAt;
           }
           exp.on_action(1);
-          exp.update(0);
         };
-        const release = () => { if (sessionOver) return; exp.on_action(0); exp.update(0); };
+        const release = () => { if (sessionOver) return; exp.on_action(0); };
         window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); press(); } }, { capture: false, passive: false });
         window.addEventListener('keyup',   (e) => { if (e.code === 'Space') { e.preventDefault(); release(); } }, { capture: false, passive: false });
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-        canvas.addEventListener('pointerdown', (e) => { if (e.button === 0) press(e.timeStamp); }, { capture: false, passive: false });
+        canvas.addEventListener('pointerdown', (e) => { 
+          if (e.button === 0) {
+            canvas.setPointerCapture(e.pointerId);
+            press(e.timeStamp);
+          }
+        }, { capture: false, passive: false });
         window.addEventListener('pointerrawupdate', (e) => { /* earliest signal hook if needed */ }, { capture: false, passive: true });
-        window.addEventListener('pointerup', (e) => { if (e.button === 0) release(); }, { capture: false, passive: false });
+        window.addEventListener('pointerup', (e) => { 
+          if (e.button === 0) {
+            if (canvas.hasPointerCapture(e.pointerId)) {
+              canvas.releasePointerCapture(e.pointerId);
+            }
+            release();
+          }
+        }, { capture: false, passive: false });
         resetBtn.addEventListener('click', () => {
           trials.length = 0;
           sessionOver = false;

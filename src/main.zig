@@ -22,6 +22,10 @@ export fn init(width: u32, height: u32) void {
     clicked = false;
 }
 
+export fn seed_rng(seed: u64) void {
+    rng_state = seed;
+}
+
 export fn update(dt_ms: f32) void {
     timer_ms += dt_ms;
 

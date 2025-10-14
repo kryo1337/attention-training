@@ -3,13 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Reaction Time (Zig + WASM)</title>
+    <title>Reaction Time</title>
     <link rel="preload" href="reaction.wasm" as="fetch" type="application/wasm" crossorigin fetchpriority="high" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
-      html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: 'IBM Plex Mono', monospace; }
+      html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace; }
       #wrap { display: grid; place-items: center; height: 100%; gap: 12px; position: relative; }
       canvas { image-rendering: pixelated; background: #000; box-shadow: 0 0 0 2px #222; touch-action: none; }
       #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
@@ -76,14 +73,24 @@
         const W = 480, H = 270;
         canvas.width = W; canvas.height = H;
         exp.init(W, H);
+        
+        if (exp.seed_rng && crypto.getRandomValues) {
+          const buf = new Uint32Array(2);
+          crypto.getRandomValues(buf);
+          const seed = (BigInt(buf[0]) << 32n) | BigInt(buf[1]);
+          exp.seed_rng(seed);
+        }
 
         let useWorker = false;
-        let ctx = canvas.getContext('2d');
+        let ctx = canvas.getContext('2d', { 
+          alpha: false, 
+          desynchronized: true 
+        });
         ctx.imageSmoothingEnabled = false;
         ctx.fillStyle = '#0040c0';
         ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#ffffff';
-        ctx.font = '16px "IBM Plex Mono", monospace';
+        ctx.font = '16px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Click to begin', W >> 1, H >> 1);
@@ -102,7 +109,7 @@
         let last = performance.now();
         let prevState = -1;
         let readyAt = 0;
-        let lastJsReactionMs = null;
+        let clickedAt = 0;
         const trials = [];
         let sessionOver = false;
 
@@ -135,12 +142,12 @@
           // 0=Idle(blue), 1=Waiting(red), 2=Ready(green), 3=Measured(purple), 4=FalseStart (red)
           const s = exp.get_state();
           if (s === 2 && prevState !== 2) {
-            readyAt = performance.now();
-            lastJsReactionMs = null;
+            readyAt = now;
+            clickedAt = 0;
           }
 
           if (!sessionOver && s === 3 && prevState !== 3) {
-            const measured = Math.round(lastJsReactionMs != null ? lastJsReactionMs : exp.get_last_reaction_ms());
+            const measured = Math.round(clickedAt > 0 ? clickedAt - readyAt : exp.get_last_reaction_ms());
             trials.push(measured);
             if (trials.length === 5) {
               const { avg, med, fast } = computeStats(trials);
@@ -151,7 +158,7 @@
           const repaint = s !== prevState;
           if (repaint) prevState = s;
 
-          const ms = Math.round(lastJsReactionMs != null ? lastJsReactionMs : exp.get_last_reaction_ms());
+          const ms = Math.round(clickedAt > 0 ? clickedAt - readyAt : exp.get_last_reaction_ms());
           if (useWorker) {
             worker.postMessage({ type: 'paint', state: s, repaint, ms });
           } else {
@@ -164,24 +171,24 @@
             }
             if (s === 3) {
               ctx.fillStyle = '#ffcc00';
-              ctx.font = '24px "IBM Plex Mono", monospace';
+              ctx.font = '24px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-              ctx.font = '14px "IBM Plex Mono", monospace';
+              ctx.font = '14px monospace';
               ctx.fillStyle = '#ffffff';
               ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
             }
             if (s === 0) {
               ctx.fillStyle = '#ffffff';
-              ctx.font = '16px "IBM Plex Mono", monospace';
+              ctx.font = '16px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('Click to begin', W >> 1, H >> 1);
             }
             if (s === 4) {
               ctx.fillStyle = '#ffffff';
-              ctx.font = '18px "IBM Plex Mono", monospace';
+              ctx.font = '18px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
@@ -191,34 +198,61 @@
           requestAnimationFrame(frame);
         }
 
+        let pointerDown = false;
         const press = (ts) => {
-          if (sessionOver) return;
+          if (sessionOver || pointerDown) return;
+          pointerDown = true;
           const s = exp.get_state();
           if (s === 2 && readyAt > 0) {
-            const nowTs = (typeof ts === 'number') ? ts : performance.now();
-            lastJsReactionMs = nowTs - readyAt;
+            clickedAt = (typeof ts === 'number') ? ts : performance.now();
           }
           exp.on_action(1);
         };
-        const release = () => { if (sessionOver) return; exp.on_action(0); };
-        window.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); press(); } }, { capture: false, passive: false });
-        window.addEventListener('keyup',   (e) => { if (e.code === 'Space') { e.preventDefault(); release(); } }, { capture: false, passive: false });
+        const release = () => { 
+          if (sessionOver) return; 
+          pointerDown = false;
+          exp.on_action(0); 
+        };
+        
+        window.addEventListener('keydown', (e) => { 
+          if (e.code === 'Space') { 
+            e.preventDefault(); 
+            press(performance.now()); 
+          } 
+        }, { capture: true, passive: false });
+        window.addEventListener('keyup', (e) => { 
+          if (e.code === 'Space') { 
+            e.preventDefault(); 
+            release(); 
+          } 
+        }, { capture: true, passive: false });
+        
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         canvas.addEventListener('pointerdown', (e) => { 
           if (e.button === 0) {
+            e.preventDefault();
             canvas.setPointerCapture(e.pointerId);
             press(e.timeStamp);
           }
-        }, { capture: false, passive: false });
-        window.addEventListener('pointerrawupdate', (e) => { /* earliest signal hook if needed */ }, { capture: false, passive: true });
+        }, { capture: true, passive: false });
+        
+        let lastRawPointer = null;
+        canvas.addEventListener('pointerrawupdate', (e) => {
+          lastRawPointer = e.timeStamp;
+          if (!pointerDown && exp.get_state() === 2 && e.pressure > 0) {
+            press(e.timeStamp);
+          }
+        }, { capture: true, passive: true });
+        
         window.addEventListener('pointerup', (e) => { 
           if (e.button === 0) {
+            e.preventDefault();
             if (canvas.hasPointerCapture(e.pointerId)) {
               canvas.releasePointerCapture(e.pointerId);
             }
             release();
           }
-        }, { capture: false, passive: false });
+        }, { capture: true, passive: false });
         resetBtn.addEventListener('click', () => {
           trials.length = 0;
           sessionOver = false;

@@ -15,7 +15,10 @@ self.onmessage = (e) => {
   if (msg.type === 'init') {
     canvas = msg.canvas;
     W = msg.size.W; H = msg.size.H;
-    ctx = canvas.getContext('2d');
+    ctx = canvas.getContext('2d', { 
+      alpha: false, 
+      desynchronized: true 
+    });
     ctx.imageSmoothingEnabled = false;
     return;
   }
@@ -28,22 +31,22 @@ self.onmessage = (e) => {
     if (s === 3) {
       const ms = msg.ms;
       ctx.fillStyle = '#ffcc00';
-      ctx.font = '24px "IBM Plex Mono", monospace';
+      ctx.font = '24px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-      ctx.font = '14px "IBM Plex Mono", monospace';
+      ctx.font = '14px monospace';
       ctx.fillStyle = '#ffffff';
       ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
     } else if (s === 0) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = '16px "IBM Plex Mono", monospace';
+      ctx.font = '16px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('Click to begin', W >> 1, H >> 1);
     } else if (s === 4) {
       ctx.fillStyle = '#ffffff';
-      ctx.font = '18px "IBM Plex Mono", monospace';
+      ctx.font = '18px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);

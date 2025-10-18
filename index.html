@@ -16,13 +16,28 @@
       #panel button { margin-top: 8px; padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
       #hint { opacity: 0.8; font-size: 14px; }
       button { padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
+      #controls { display: flex; gap: 8px; align-items: center; color: #ccc; font-size: 14px; }
+      #controls label { opacity: 0.85; }
+      #controls select { padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
+      #controls input { width: 72px; padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
     </style>
   </head>
   <body>
     <div id="wrap">
       <canvas id="canvas" width="480" height="270"></canvas>
+      <div id="controls">
+        <label for="trial-count">Trials per session:</label>
+        <select id="trial-count">
+          <option value="5">5</option>
+          <option value="10">10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <input id="trial-custom" type="number" min="1" step="1" value="5" aria-label="Custom trials" hidden />
+      </div>
       <div id="overlay"><div id="panel">
-        <h2>Results (5 trials)</h2>
+        <h2 id="resultsTitle">Results (5 trials)</h2>
         <div class="nums">
           <div id="avg">Average: -</div>
           <div id="med">Median: -</div>
@@ -40,6 +55,9 @@
       const medEl = document.getElementById('med');
       const fastEl = document.getElementById('fast');
       const resetBtn = document.getElementById('reset');
+      const trialSelect = document.getElementById('trial-count');
+      const trialCustom = document.getElementById('trial-custom');
+      const resultsTitle = document.getElementById('resultsTitle');
 
       function resizeCanvas() {
         const w = Math.min(window.innerWidth - 24, 960);
@@ -112,6 +130,21 @@
         let clickedAt = 0;
         const trials = [];
         let sessionOver = false;
+        let trialGoal = parseInt(trialSelect.value, 10);
+        let lastCustomValue = Math.max(1, parseInt(trialCustom.value, 10) || 5);
+
+        if (Number.isNaN(trialGoal)) {
+          trialGoal = lastCustomValue;
+          trialSelect.value = 'custom';
+          trialCustom.hidden = false;
+        } else {
+          trialCustom.hidden = trialSelect.value !== 'custom';
+        }
+
+        const updateResultsTitle = () => {
+          resultsTitle.textContent = 'Results (' + trialGoal + ' trials)';
+        };
+        updateResultsTitle();
 
         function showOverlay(a, m, f) {
           avgEl.textContent = 'Average: ' + Math.round(a) + ' ms';
@@ -149,7 +182,7 @@
           if (!sessionOver && s === 3 && prevState !== 3) {
             const measured = Math.round(clickedAt > 0 ? clickedAt - readyAt : exp.get_last_reaction_ms());
             trials.push(measured);
-            if (trials.length === 5) {
+            if (trials.length === trialGoal) {
               const { avg, med, fast } = computeStats(trials);
               showOverlay(avg, med, fast);
             }
@@ -199,6 +232,30 @@
         }
 
         let pointerDown = false;
+        const resetSession = () => {
+          pointerDown = false;
+          trials.length = 0;
+          sessionOver = false;
+          clickedAt = 0;
+          readyAt = 0;
+          prevState = -1;
+          last = performance.now();
+          hideOverlay();
+          exp.on_action(0);
+          exp.reset();
+          if (useWorker) {
+            worker.postMessage({ type: 'paint', state: exp.get_state(), repaint: true, ms: 0 });
+          } else if (ctx) {
+            ctx.fillStyle = '#0040c0';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Click to begin', W >> 1, H >> 1);
+          }
+          updateResultsTitle();
+        };
         const press = (ts) => {
           if (sessionOver || pointerDown) return;
           pointerDown = true;
@@ -218,7 +275,10 @@
           if (e.code === 'Space') { 
             e.preventDefault(); 
             press(performance.now()); 
-          } 
+          } else if (e.code === 'KeyR') {
+            e.preventDefault();
+            resetSession();
+          }
         }, { capture: true, passive: false });
         window.addEventListener('keyup', (e) => { 
           if (e.code === 'Space') { 
@@ -254,10 +314,42 @@
           }
         }, { capture: true, passive: false });
         resetBtn.addEventListener('click', () => {
-          trials.length = 0;
-          sessionOver = false;
-          hideOverlay();
-          exp.reset();
+          resetSession();
+        });
+
+        trialSelect.addEventListener('change', () => {
+          const sel = trialSelect.value;
+          if (sel === 'custom') {
+            trialCustom.hidden = false;
+            const next = Math.max(1, parseInt(trialCustom.value, 10) || lastCustomValue);
+            lastCustomValue = next;
+            trialGoal = next;
+            updateResultsTitle();
+            resetSession();
+          } else {
+            trialCustom.hidden = true;
+            const next = parseInt(sel, 10);
+            if (Number.isNaN(next)) return;
+            trialGoal = next;
+            updateResultsTitle();
+            resetSession();
+          }
+        });
+
+        trialCustom.addEventListener('change', () => {
+          if (trialCustom.hidden) return;
+          const parsed = Math.max(1, parseInt(trialCustom.value, 10) || lastCustomValue);
+          lastCustomValue = parsed;
+          trialGoal = parsed;
+          updateResultsTitle();
+          resetSession();
+        });
+
+        trialCustom.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            trialCustom.dispatchEvent(new Event('change'));
+          }
         });
 
         requestAnimationFrame(frame);

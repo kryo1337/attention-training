@@ -16,7 +16,7 @@
       #panel button { margin-top: 8px; padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
       #hint { opacity: 0.8; font-size: 14px; }
       button { padding: 6px 10px; background: #222; color: #ddd; border: 1px solid #333; border-radius: 6px; }
-      #controls { display: flex; gap: 8px; align-items: center; color: #ccc; font-size: 14px; }
+      #controls { display: flex; flex-direction: column; gap: 8px; align-items: center; color: #ccc; font-size: 14px; }
       #controls label { opacity: 0.85; }
       #controls select { padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
       #controls input { width: 72px; padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
@@ -33,6 +33,7 @@
     <div id="wrap">
       <canvas id="canvas" width="480" height="270"></canvas>
       <div id="controls">
+        <span id="hint">click/space to advance, r to reset</span>
         <label for="trial-count">Trials per session:</label>
         <select id="trial-count">
           <option value="5">5</option>
@@ -268,7 +269,20 @@
           pointerDown = true;
           const s = exp.get_state();
           if (s === 2 && readyAt > 0) {
-            clickedAt = (typeof ts === 'number') ? ts : performance.now();
+            clickedAt = (typeof ts === 'number' && ts > 0) ? ts : performance.now();
+            if (navigator.getPredictedEvents) {
+              try {
+                const predicted = navigator.getPredictedEvents();
+                if (predicted.length > 0) {
+                  for (let i = 0; i < predicted.length; i++) {
+                    if (predicted[i].type === 'pointerdown') {
+                      clickedAt = predicted[i].timeStamp;
+                      break;
+                    }
+                  }
+                }
+              } catch (e) { /* ignore */ }
+            }
           }
           exp.on_action(1);
         };
@@ -281,7 +295,7 @@
         window.addEventListener('keydown', (e) => { 
           if (e.code === 'Space') { 
             e.preventDefault(); 
-            press(performance.now()); 
+            press(e.timeStamp); 
           } else if (e.code === 'KeyR') {
             e.preventDefault();
             resetSession();

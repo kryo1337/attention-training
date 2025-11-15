@@ -20,7 +20,20 @@ const server = http.createServer(async (req, res) => {
     const filePath = new URL(`.${path}`, import.meta.url);
     const data = await readFile(filePath);
     const type = mime[extname(path)] || 'application/octet-stream';
-    res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
+    
+    let cacheControl = 'no-store';
+    if (path.endsWith('.wasm') || path.endsWith('.js')) {
+      cacheControl = 'public, max-age=31536000, immutable';
+    } else if (path.endsWith('.html')) {
+      cacheControl = 'no-cache';
+    }
+
+    res.writeHead(200, { 
+      'content-type': type, 
+      'cache-control': cacheControl,
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'require-corp',
+    });
     res.end(data);
   } catch (err) {
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });

@@ -13,6 +13,7 @@ pub fn build(b: *std.Build) void {
             .single_threaded = true,
         }),
     });
+    exe.lto = .full;
     exe.entry = .disabled;
     exe.rdynamic = true;
     exe.root_module.strip = optimize != .Debug;

@@ -1,6 +1,0 @@
-{
-  "scripts": {
-    "build": "zig build copy-wasm",
-    "vercel-build": "zig build copy-wasm"
-  }
-}

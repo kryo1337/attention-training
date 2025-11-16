@@ -12,45 +12,50 @@ function drawBackground(state) {
 
 self.onmessage = (e) => {
   const msg = e.data;
-  if (msg.type === 'init') {
-    canvas = msg.canvas;
-    W = msg.size.W; H = msg.size.H;
-    ctx = canvas.getContext('2d', { 
-      alpha: false, 
-      desynchronized: true 
-    });
-    ctx.imageSmoothingEnabled = false;
-    return;
-  }
-  if (!ctx) return;
+  switch (msg.type) {
+    case 'init':
+      canvas = msg.canvas;
+      W = msg.size.W; H = msg.size.H;
+      ctx = canvas.getContext('2d', { 
+        alpha: false, 
+        desynchronized: true 
+      });
+      ctx.imageSmoothingEnabled = false;
+      return;
+    case 'paint':
+      if (!ctx) return;
+      const s = msg.state;
+      if (msg.repaint) drawBackground(s);
 
-  if (msg.type === 'paint') {
-    const s = msg.state;
-    if (msg.repaint) drawBackground(s);
-
-    if (s === 3) {
-      const ms = msg.ms;
-      ctx.fillStyle = '#ffcc00';
-      ctx.font = '24px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-      ctx.font = '14px monospace';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
-    } else if (s === 0) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '16px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Click to begin', W >> 1, H >> 1);
-    } else if (s === 4) {
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '18px monospace';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
-    }
+      switch (s) {
+        case 3: {
+          const ms = msg.ms;
+          ctx.fillStyle = '#ffcc00';
+          ctx.font = '24px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(ms + ' ms', W >> 1, H >> 1);
+          ctx.font = '14px monospace';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
+          break;
+        }
+        case 0:
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '16px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Click to begin', W >> 1, H >> 1);
+          break;
+        case 4:
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '18px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
+          break;
+      }
+      break;
   }
 };
 

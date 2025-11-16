@@ -27,6 +27,7 @@ export fn seed_rng(seed: u64) void {
 }
 
 export fn update(dt_ms: f32) void {
+    @setFloatMode(.Optimized);
     timer_ms += dt_ms;
 
     switch (state) {

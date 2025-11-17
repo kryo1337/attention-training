@@ -1,4 +1,4 @@
-# Reaction Time
+# pureReaction
 
 > The ultimate web-based tool for measuring and training your reflexes with near-native speed and accuracy.
 

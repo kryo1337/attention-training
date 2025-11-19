@@ -1,9 +1,15 @@
 const std = @import("std");
 
 var rng_state: u64 = 0x9e3779b97f4a7c15;
+fn xorshift64star() u64 {
+    rng_state ^= rng_state >> 12;
+    rng_state ^= rng_state << 25;
+    rng_state ^= rng_state >> 27;
+    return rng_state *% 0x2545F4914F6CDD1D;
+}
+
 fn randomU32() u32 {
-    rng_state = rng_state *% 2862933555777941757 +% 3037000493;
-    return @truncate(rng_state >> 32);
+    return @truncate(xorshift64star() >> 32);
 }
 
 const GameState = enum { Idle, Waiting, Ready, Measured, FalseStart };
@@ -23,7 +29,19 @@ export fn init(width: u32, height: u32) void {
 }
 
 export fn seed_rng(seed: u64) void {
-    rng_state = seed;
+    if (seed == 0) {
+        rng_state = 0x9e3779b97f4a7c15;
+    } else {
+        rng_state = seed;
+    }
+}
+
+fn startWaiting() void {
+    state = .Waiting;
+    timer_ms = 0.0;
+    const r = randomU32();
+    const delay = 1500.0 + @as(f32, @floatFromInt(r % 1501));
+    target_delay_ms = delay;
 }
 
 export fn update(dt_ms: f32) void {
@@ -34,11 +52,7 @@ export fn update(dt_ms: f32) void {
         .Idle => {
             if (clicked) {
                 clicked = false;
-                state = .Waiting;
-                timer_ms = 0.0;
-                const r = randomU32();
-                const delay = 1500.0 + @as(f32, @floatFromInt(r % 1501));
-                target_delay_ms = delay;
+                startWaiting();
             }
         },
         .Waiting => {
@@ -59,24 +73,10 @@ export fn update(dt_ms: f32) void {
                 timer_ms = 0.0;
             }
         },
-        .Measured => {
+        .Measured, .FalseStart => {
             if (clicked) {
                 clicked = false;
-                state = .Waiting;
-                timer_ms = 0.0;
-                const r = randomU32();
-                const delay = 1500.0 + @as(f32, @floatFromInt(r % 1501));
-                target_delay_ms = delay;
-            }
-        },
-        .FalseStart => {
-            if (clicked) {
-                clicked = false;
-                state = .Waiting;
-                timer_ms = 0.0;
-                const r = randomU32();
-                const delay = 1500.0 + @as(f32, @floatFromInt(r % 1501));
-                target_delay_ms = delay;
+                startWaiting();
             }
         },
     }

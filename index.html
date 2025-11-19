@@ -176,6 +176,43 @@
           const fast = sorted[0];
           return { avg, med, fast };
         }
+        function paint(ctx, W, H, s, repaint, ms) {
+          if (repaint) {
+            if (s === 0) ctx.fillStyle = '#0040c0';
+            else if (s === 1 || s === 4) ctx.fillStyle = '#c02030';
+            else if (s === 2) ctx.fillStyle = '#18a040';
+            else ctx.fillStyle = '#8020c0';
+            ctx.fillRect(0, 0, W, H);
+          }
+
+          switch (s) {
+            case 3: {
+              ctx.fillStyle = '#ffcc00';
+              ctx.font = '24px monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(ms + ' ms', W >> 1, H >> 1);
+              ctx.font = '14px monospace';
+              ctx.fillStyle = '#ffffff';
+              ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
+              break;
+            }
+            case 0:
+              ctx.fillStyle = '#ffffff';
+              ctx.font = '16px monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('Click to begin', W >> 1, H >> 1);
+              break;
+            case 4:
+              ctx.fillStyle = '#ffffff';
+              ctx.font = '18px monospace';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
+              break;
+          }
+        }
         function frame(now) {
           const dt = now - last; last = now;
           exp.update(dt);
@@ -203,37 +240,7 @@
           if (useWorker) {
             worker.postMessage({ type: 'paint', state: s, repaint, ms });
           } else {
-            if (repaint) {
-              if (s === 0) ctx.fillStyle = '#0040c0';
-              else if (s === 1 || s === 4) ctx.fillStyle = '#c02030';
-              else if (s === 2) ctx.fillStyle = '#18a040';
-              else ctx.fillStyle = '#8020c0';
-              ctx.fillRect(0, 0, W, H);
-            }
-            if (s === 3) {
-              ctx.fillStyle = '#ffcc00';
-              ctx.font = '24px monospace';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-              ctx.font = '14px monospace';
-              ctx.fillStyle = '#ffffff';
-              ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
-            }
-            if (s === 0) {
-              ctx.fillStyle = '#ffffff';
-              ctx.font = '16px monospace';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('Click to begin', W >> 1, H >> 1);
-            }
-            if (s === 4) {
-              ctx.fillStyle = '#ffffff';
-              ctx.font = '18px monospace';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
-            }
+            paint(ctx, W, H, s, repaint, ms);
           }
 
           requestAnimationFrame(frame);

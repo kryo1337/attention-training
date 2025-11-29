@@ -8,8 +8,8 @@
     <style>
       html, body { height: 100%; margin: 0; background: #111; color: #ddd; font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, 'Courier New', monospace; }
       #wrap { display: grid; place-items: center; height: 100%; gap: 12px; position: relative; }
-      canvas { image-rendering: pixelated; background: #000; box-shadow: 0 0 0 2px #222; touch-action: none; }
-      #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; }
+      canvas { image-rendering: pixelated; background: #000; box-shadow: 0 0 0 2px #222; touch-action: none; max-width: 100%; max-height: 100%; }
+      #overlay { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; z-index: 20; }
       #panel { background: rgba(0,0,0,0.8); color: #fff; padding: 12px 16px; border: 1px solid #333; border-radius: 8px; min-width: 240px; text-align: center; }
       #panel h2 { margin: 0 0 8px 0; font-size: 16px; font-weight: 600; }
       #panel .nums { display: grid; gap: 6px; margin: 8px 0; font-size: 14px; }
@@ -20,6 +20,12 @@
       #controls label { opacity: 0.85; }
       #controls select { padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
       #controls input { width: 72px; padding: 4px 6px; background: #1a1a1a; color: #ddd; border: 1px solid #333; border-radius: 4px; }
+      #header-icons { position: absolute; top: 16px; right: 16px; display: flex; gap: 12px; z-index: 10; }
+      #header-icons a { color: #666; transition: color 0.2s, transform 0.2s; display: flex; align-items: center; justify-content: center; }
+      #header-icons a:hover { color: #ddd; transform: scale(1.1); }
+      #footer { position: absolute; bottom: 12px; left: 0; width: 100%; text-align: center; font-size: 12px; color: #444; z-index: 10; pointer-events: none; display: flex; flex-direction: column; gap: 4px; }
+      #footer a { color: #666; text-decoration: none; pointer-events: auto; transition: color 0.2s; }
+      #footer a:hover { color: #ddd; }
     </style>
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-WP1BV7L2Y5"></script>
     <script>
@@ -31,6 +37,14 @@
   </head>
   <body>
     <div id="wrap">
+      <div id="header-icons">
+        <a href="https://buymeacoffee.com/kryo" target="_blank" aria-label="Buy Me a Coffee">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M20 3H4v10c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3M4 19h16v2H4z"/></svg>
+        </a>
+        <a href="https://github.com/kryo1337/pure-reaction" target="_blank" aria-label="GitHub">
+          <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+      </div>
       <canvas id="canvas" width="480" height="270"></canvas>
       <div id="controls">
         <span id="hint">left click/space to react, r to reset</span>
@@ -53,6 +67,10 @@
         </div>
         <button id="reset">Reset</button>
       </div></div>
+      <div id="footer">
+        <div>developed by <a href="https://kryo.dev" target="_blank">kryo</a></div>
+        <div>&copy; 2025 pureReaction</div>
+      </div>
     </div>
     <script>
       const canvas = document.getElementById('canvas');
@@ -68,13 +86,10 @@
       const resultsTitle = document.getElementById('resultsTitle');
 
       function resizeCanvas() {
-        const w = Math.min(window.innerWidth - 24, 960);
+        const w = window.innerWidth - 24;
         const h = Math.min(window.innerHeight - 120, 540);
-        const aspect = 16/9;
-        let tw = w, th = Math.round(w / aspect);
-        if (th > h) { th = h; tw = Math.round(h * aspect); }
-        canvas.style.width = tw + 'px';
-        canvas.style.height = th + 'px';
+        canvas.style.width = w + 'px';
+        canvas.style.height = h + 'px';
       }
       window.addEventListener('resize', resizeCanvas);
       resizeCanvas();
@@ -96,16 +111,47 @@
       (async () => {
         const wasm = await wasmPromise;
         const exp = wasm.exports;
-        const W = 480, H = 270;
+        const rect = canvas.getBoundingClientRect();
+        let W = Math.floor(rect.width) || 480;
+        let H = Math.floor(rect.height) || 270;
         canvas.width = W; canvas.height = H;
         exp.init(W, H);
         
-        if (exp.seed_rng && crypto.getRandomValues) {
-          const buf = new Uint32Array(2);
-          crypto.getRandomValues(buf);
-          const seed = (BigInt(buf[0]) << 32n) | BigInt(buf[1]);
-          exp.seed_rng(seed);
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+            const rect = canvas.getBoundingClientRect();
+            W = Math.floor(rect.width);
+            H = Math.floor(rect.height);
+            
+            if (useWorker) {
+              worker.postMessage({ type: 'resize', size: { W, H }, state: exp.get_state(), ms: Math.round(exp.get_last_reaction_ms()) });
+            } else {
+              canvas.width = W;
+              canvas.height = H;
+              // Context needs to be restored after resize clears it
+              if (ctx) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.font = '24px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+              }
+              // Force repaint by invalidating state
+              prevState = -1;
+            }
+          }, 50);
+        });
+
+        function seedRng() {
+          if (exp.seed_rng && crypto.getRandomValues) {
+            const buf = new Uint32Array(2);
+            crypto.getRandomValues(buf);
+            const seed = (BigInt(buf[0]) << 32n) | BigInt(buf[1]);
+            exp.seed_rng(seed);
+          }
         }
+        seedRng();
 
         let useWorker = false;
         let ctx = canvas.getContext('2d', { 
@@ -116,7 +162,7 @@
         ctx.fillStyle = '#0040c0';
         ctx.fillRect(0, 0, W, H);
         ctx.fillStyle = '#ffffff';
-        ctx.font = '16px monospace';
+        ctx.font = '24px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('Click to begin', W >> 1, H >> 1);
@@ -188,25 +234,25 @@
           switch (s) {
             case 3: {
               ctx.fillStyle = '#ffcc00';
-              ctx.font = '24px monospace';
+              ctx.font = '40px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText(ms + ' ms', W >> 1, H >> 1);
-              ctx.font = '14px monospace';
+              ctx.font = '20px monospace';
               ctx.fillStyle = '#ffffff';
-              ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 28);
+              ctx.fillText('Click to begin next trial', W >> 1, (H >> 1) + 40);
               break;
             }
             case 0:
               ctx.fillStyle = '#ffffff';
-              ctx.font = '16px monospace';
+              ctx.font = '24px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('Click to begin', W >> 1, H >> 1);
               break;
             case 4:
               ctx.fillStyle = '#ffffff';
-              ctx.font = '18px monospace';
+              ctx.font = '28px monospace';
               ctx.textAlign = 'center';
               ctx.textBaseline = 'middle';
               ctx.fillText('False start! Click to restart trial', W >> 1, H >> 1);
@@ -258,13 +304,14 @@
           hideOverlay();
           exp.on_action(0);
           exp.reset();
+          seedRng();
           if (useWorker) {
             worker.postMessage({ type: 'paint', state: exp.get_state(), repaint: true, ms: 0 });
           } else if (ctx) {
             ctx.fillStyle = '#0040c0';
             ctx.fillRect(0, 0, W, H);
             ctx.fillStyle = '#ffffff';
-            ctx.font = '16px monospace';
+            ctx.font = '24px monospace';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('Click to begin', W >> 1, H >> 1);

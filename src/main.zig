@@ -14,9 +14,9 @@ fn randomU32() u32 {
 
 const GameState = enum { Idle, Waiting, Ready, Measured, FalseStart };
 var state: GameState = .Idle;
-var timer_ms: f32 = 0.0;
-var target_delay_ms: f32 = 0.0;
-var last_reaction_ms: f32 = 0.0;
+var timer_ms: f64 = 0.0;
+var target_delay_ms: f64 = 0.0;
+var last_reaction_ms: f64 = 0.0;
 var clicked: bool = false;
 
 export fn init(width: u32, height: u32) void {
@@ -40,12 +40,11 @@ fn startWaiting() void {
     state = .Waiting;
     timer_ms = 0.0;
     const r = randomU32();
-    const delay = 1500.0 + @as(f32, @floatFromInt(r % 1501));
+    const delay = 1500.0 + @as(f64, @floatFromInt(r % 1501));
     target_delay_ms = delay;
 }
 
-export fn update(dt_ms: f32) void {
-    @setFloatMode(.Optimized);
+export fn update(dt_ms: f64) void {
     timer_ms += dt_ms;
 
     switch (state) {
@@ -92,7 +91,7 @@ export fn get_state() u32 {
     return @intFromEnum(state);
 }
 
-export fn get_last_reaction_ms() f32 {
+export fn get_last_reaction_ms() f64 {
     return last_reaction_ms;
 }
 
